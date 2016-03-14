@@ -89,7 +89,7 @@ HMODULE GetPotInst(const PROCESS_INFORMATION &ProcessInformation)
 				}
 			}
 		}
-		Sleep(10);
+		Sleep(200);
 	}
 	return 0;
 }
