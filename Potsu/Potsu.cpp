@@ -105,7 +105,6 @@ bool PatchPotsu(HANDLE hProcess, DWORD dwProcessId, HMODULE hModule)
 		return false;
 	else
 	{
-		MessageBox(0, 0, 0, 0);
 		BYTE Patch[1] = { 0x81 };
 
 		int PatchSize = _countof(Patch);
