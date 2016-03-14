@@ -66,6 +66,18 @@ int search_ptn(LPWORD ptn, size_t ptn_size, LPBYTE *addr, HANDLE hProcess, HMODU
 	return searchSuccessCount;
 }
 
+void patch_ptn(HANDLE hProcess, DWORD dwProcessId, LPBYTE addr, BYTE* Patch, int PatchSize)
+{
+	DWORD OldProtect, OldProtect2;
+	HANDLE hHandle;
+	hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, dwProcessId);
+	VirtualProtectEx(hHandle, (void *)addr, PatchSize, PAGE_EXECUTE_READWRITE, &OldProtect);
+	WriteProcessMemory(hProcess, addr, Patch, PatchSize, NULL);
+	hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, dwProcessId);
+	VirtualProtectEx(hHandle, (void *)addr, PatchSize, OldProtect, &OldProtect2);
+	return;
+}
+
 HMODULE GetPotInst(const PROCESS_INFORMATION &ProcessInformation)
 {
 	BOOL bExit = false;
@@ -73,12 +85,11 @@ HMODULE GetPotInst(const PROCESS_INFORMATION &ProcessInformation)
 	{
 		HMODULE hMods[1024];
 		DWORD cbNeeded;
+		TCHAR szModName[MAX_PATH];
 		if (EnumProcessModules(ProcessInformation.hProcess, hMods, sizeof(hMods), &cbNeeded))
 		{
 			for (size_t i = 0; i < (cbNeeded / sizeof(HMODULE)); i++)
 			{
-				TCHAR szModName[MAX_PATH];
-
 				if (GetModuleFileNameEx(ProcessInformation.hProcess, hMods[i], szModName, sizeof(szModName) / sizeof(TCHAR)))
 				{
 					_wcslwr_s(szModName, MAX_PATH);
@@ -97,26 +108,33 @@ HMODULE GetPotInst(const PROCESS_INFORMATION &ProcessInformation)
 bool PatchPotsu(HANDLE hProcess, DWORD dwProcessId, HMODULE hModule)
 {
 	WORD ptn[] = { 0x89, 0x6C, 0x24, 0x1C, 0x8B, 0x45, 0x00, 0x83, 0x78, 0xF4, 0x00, 0x0F, 0x84 };
+	WORD ptn2[] = { 0x8B, 0x85, 0xF0, 0x00, 0x00, 0x00, 0x83, 0x78, 0xF4, 0x00, 0x75, 0x1C };
 
 	LPBYTE addr = 0;
-	int r = search_ptn(ptn, _countof(ptn), &addr, hProcess, hModule);
+	int r;
+	r = search_ptn(ptn, _countof(ptn), &addr, hProcess, hModule);
 
 	if (r == 0 || r > 1)
 		return false;
 	else
 	{
 		BYTE Patch[1] = { 0x81 };
-
 		int PatchSize = _countof(Patch);
 		addr += 12;
+		patch_ptn(hProcess, dwProcessId, addr, Patch, PatchSize);
+	}
 
-		DWORD OldProtect, OldProtect2;
-		HANDLE hHandle;
-		hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, dwProcessId);
-		VirtualProtectEx(hHandle, (void *)addr, PatchSize, PAGE_EXECUTE_READWRITE, &OldProtect);
-		WriteProcessMemory(hProcess, addr, Patch, PatchSize, NULL);
-		hHandle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, FALSE, dwProcessId);
-		VirtualProtectEx(hHandle, (void *)addr, PatchSize, OldProtect, &OldProtect2);
+	addr = 0;
+	r = search_ptn(ptn2, _countof(ptn2), &addr, hProcess, hModule);
+
+	if (r == 0 || r > 1)
+		return false;
+	else
+	{
+		BYTE Patch[2] = { 0x90, 0x90 };
+		int PatchSize = _countof(Patch);
+		addr += 10;
+		patch_ptn(hProcess, dwProcessId, addr, Patch, PatchSize);
 	}
 
 	return true;
@@ -142,6 +160,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		MessageBox(0, L"PotPlayer.exe 파일을 찾을 수 없습니다.", L"PotPlayer Not Found", MB_ICONERROR);
 		return 0;
 	}
+	Sleep(1000);
 	HMODULE hModule = GetPotInst(ProcessInformation);
 	if (!PatchPotsu(ProcessInformation.hProcess, ProcessInformation.dwProcessId, hModule))
 		MessageBox(0, L"Patch failed", 0, 0);
