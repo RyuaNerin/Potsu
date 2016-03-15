@@ -160,7 +160,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		MessageBox(0, L"PotPlayer.exe 파일을 찾을 수 없습니다.", L"PotPlayer Not Found", MB_ICONERROR);
 		return 0;
 	}
-	Sleep(1000);
+	Sleep(2000);
 	HMODULE hModule = GetPotInst(ProcessInformation);
 	if (!PatchPotsu(ProcessInformation.hProcess, ProcessInformation.dwProcessId, hModule))
 		MessageBox(0, L"Patch failed", 0, 0);
